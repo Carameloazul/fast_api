@@ -1,5 +1,17 @@
 from fastapi import FastAPI, Body
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from typing import Optional
+
+class Movies(BaseModel):
+    #id : int | None = None
+    id: Optional[int]
+    title:str
+    overview:str
+    year:int
+    rating:float
+    category:str
+
 
 app = FastAPI()
 #Cambiando el titulo de docs
@@ -47,6 +59,8 @@ def get_movie(id:int):
 
     return []
 
+# Sino agrego nada luego del parametro de entrada, la funcion
+# Lo toma como una query
 @app.get('/movies/', tags=['movies'])
 def get_movies_by_category(category:str, year:int):
     movie = list(filter(lambda x: x['category'] == category and x['year'] == year, movies))
@@ -54,18 +68,47 @@ def get_movies_by_category(category:str, year:int):
     return movie
 
 @app.post('/movies',tags=['movies'])
-def add_movie(id:int = Body(),title:str= Body(), 
-              overview:str= Body(), year:int= Body(),
-              rating:float= Body(), category:str = Body() ):
-    movies.append({
-        "id":id,
-        "title":title,
-        "overview": overview,
-        "year":year,
-        "rating":rating,
-        "category":category
-    })
+# def add_movie(id:int = Body(),title:str= Body(), 
+#               overview:str= Body(), year:int= Body(),
+#               rating:float= Body(), category:str = Body() ):
+def add_movie(movie:Movies):
+    # movies.append({
+    #     "id":id,
+    #     "title":title,
+    #     "overview": overview,
+    #     "year":year,
+    #     "rating":rating,
+    #     "category":category
+    # })
+    movies.append(movie)
     return movies
+
+# El metodo PUT es idempotente lo cual hace que aunque se vuelva a llamar
+# Se va a obtener el mismo resultado
+@app.put('/movies/{id}', tags=['movies'])
+# def update_movies(id:int, title:str=Body(), 
+#                   overview:str=Body(), year:int=Body(), 
+#                   rating:float= Body(), category:str=Body()):
+def update_movies(id:int, movie:Movies):
+    for item in movies:
+        if item['id'] == id:
+           
+            item['title']= movie.title
+            item['overview']= movie.overview
+            item['year']= movie.year
+            item['rating']= movie.rating
+            item['category']= movie.category
+            
+            return movies
+
+@app.delete('/movies/{id}', tags=['movies'])
+def delete_movies(id:int):
+    for movie in movies:
+        if movie['id'] == id:
+            movies.remove(movie)
+        
+            return movies
+
 
 # Para ejecutar el servicio se utiliza la libreria uvicorn
 # Se indica el fichero y luego el nombre de la aplicacion en este caso app
