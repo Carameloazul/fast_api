@@ -1,17 +1,42 @@
-from fastapi import FastAPI, Body
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-from typing import Optional
+from fastapi import FastAPI, Body, Path, Query
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel, Field
+from typing import Optional, Annotated, List
+# JSONresponse no es obligatorio, ya que fastapi lo usa por debajo
+# https://fastapi.tiangolo.com/advanced/response-directly/
 
+# Puedo validar y poner valores por defecto a las variables
+# Con el parametro le(less equal) declaro que el valor entrante
+# Tiene que ser menor o igual al que se le asigne eje: le = 1000
+# El parametro ge(greater equal) establece un minimo
 class Movies(BaseModel):
     #id : int | None = None
-    id: Optional[int]
-    title:str
-    overview:str
-    year:int
-    rating:float
-    category:str
+    id: Optional[int] 
+    title:str = Field(default="Ninguno", min_length=5, max_length=50, description= "El nombre de la pelicula")
+    overview:str = Field(default="Algo sobre la pelicula",min_length=15, max_length=50, description="Una descripcion del filme")
+    year:int = Field(default=2019,le=2022, title="Ano de este siglo")
+    rating:float = Field(default=9.8,ge=1,le=10)
+    category:str = Field(default="Accion",max_length=200)
 
+    # El contenido por defecto se puede poner de la sgt manera:
+
+
+    # Esto no funciona, no se aun porque      
+    # model_config ={
+    #     "json_schema_extra":{
+    #           "example":[
+    #               {
+    #                 "id":1,                 
+    #                 "title" : "Mi pelicula",
+    #                 "overview" : "Descripcion de la pelicula",
+    #                 "year" : 2022,
+    #                 "rating" : 9.8,
+    #                 "category" : "Accion"
+    #                }
+    #                 ]                
+    #               }
+    #         }
+        
 
 app = FastAPI()
 #Cambiando el titulo de docs
@@ -31,7 +56,7 @@ movies = [
         "id" : 1,
         "title": "Avatar",
         "overview": "En un exuberante planeta llamado Pandora viven los Na'vi",
-        "year" : 2009,
+        "year" : 1999,
         "rating" : 7.8,
         "category" : "Accion"
     },
@@ -39,7 +64,7 @@ movies = [
         "id" : 2,
         "title": "Titanic",
         "overview": "Una historia de amor que se desarrolla en un gran barco que se hunde por el choque de un iceberg",
-        "year" : 2009,
+        "year" : 1988,
         "rating" : 7.8,
         "category" : "Accion"
     }
@@ -49,20 +74,20 @@ movies = [
 @app.get('/movies', tags=['movies'])
 def get_movies():
     
-    return movies
+    return JSONResponse(content=movies)
 
 @app.get('/movies/{id}',tags=['movies'])
-def get_movie(id:int):
+def get_movie(id:int = Path(ge=1, le=2000)):
     for item in movies:
         if item["id"] == id:
-            return item
+            return JSONResponse(content=item)
 
-    return []
+    return JSONResponse(content=[])
 
 # Sino agrego nada luego del parametro de entrada, la funcion
 # Lo toma como una query
 @app.get('/movies/', tags=['movies'])
-def get_movies_by_category(category:str, year:int):
+def get_movies_by_category(category:str= Query(max_length=10), year:int = Query(le=2000)):
     movie = list(filter(lambda x: x['category'] == category and x['year'] == year, movies))
     
     return movie
@@ -71,25 +96,19 @@ def get_movies_by_category(category:str, year:int):
 # def add_movie(id:int = Body(),title:str= Body(), 
 #               overview:str= Body(), year:int= Body(),
 #               rating:float= Body(), category:str = Body() ):
-def add_movie(movie:Movies):
-    # movies.append({
-    #     "id":id,
-    #     "title":title,
-    #     "overview": overview,
-    #     "year":year,
-    #     "rating":rating,
-    #     "category":category
-    # })
+def add_movie(movie:Movies=Body()):
     movies.append(movie)
+    
     return movies
 
 # El metodo PUT es idempotente lo cual hace que aunque se vuelva a llamar
 # Se va a obtener el mismo resultado
+
 @app.put('/movies/{id}', tags=['movies'])
 # def update_movies(id:int, title:str=Body(), 
 #                   overview:str=Body(), year:int=Body(), 
 #                   rating:float= Body(), category:str=Body()):
-def update_movies(id:int, movie:Movies):
+def update_movies(id:int =Path(ge=1), movie:Movies = Body()):
     for item in movies:
         if item['id'] == id:
            
@@ -102,13 +121,12 @@ def update_movies(id:int, movie:Movies):
             return movies
 
 @app.delete('/movies/{id}', tags=['movies'])
-def delete_movies(id:int):
+def delete_movies(id:int= Path(max_length=4)):
     for movie in movies:
         if movie['id'] == id:
             movies.remove(movie)
         
             return movies
-
 
 # Para ejecutar el servicio se utiliza la libreria uvicorn
 # Se indica el fichero y luego el nombre de la aplicacion en este caso app
