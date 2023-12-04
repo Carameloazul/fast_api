@@ -1,3 +1,4 @@
+from fastapi.encoders import jsonable_encoder
 from fastapi import FastAPI, Body, Path, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
@@ -71,46 +72,46 @@ movies = [
 
 ]
 
-@app.get('/movies', tags=['movies'])
+@app.get('/movies', tags=['movies'],response_model=List[Movies])
 def get_movies():
     
-    return JSONResponse(content=movies)
+    return JSONResponse(content=jsonable_encoder(movies))
 
-@app.get('/movies/{id}',tags=['movies'])
+@app.get('/movies/{id}',tags=['movies'], response_model=Movies)
 def get_movie(id:int = Path(ge=1, le=2000)):
     for item in movies:
         if item["id"] == id:
-            return item
-            #return JSONResponse(content=item)
+            #return item
+            return JSONResponse(content=item)
 
-    return []
+    return JSONResponse([])
     #return JSONResponse(content=[])
 
 # Sino agrego nada luego del parametro de entrada, la funcion
 # Lo toma como una query
-@app.get('/movies/', tags=['movies'])
+@app.get('/movies/', tags=['movies'], status_code=200)
 def get_movies_by_category(category:str= Query(max_length=10), year:int = Query(le=2000)):
     movie = list(filter(lambda x: x['category'] == category and x['year'] == year, movies))
     
     return movie
 
-@app.post('/movies',tags=['movies'])
+@app.post('/movies',tags=['movies'],response_model=List[Movies] ,status_code=201)
 # def add_movie(id:int = Body(),title:str= Body(), 
 #               overview:str= Body(), year:int= Body(),
 #               rating:float= Body(), category:str = Body() ):
 def add_movie(movie:Movies=Body()):
     movies.append(movie)
-    
-    return movies
+    #return list(movies)
+    return JSONResponse(content=jsonable_encoder(movies))
 
 # El metodo PUT es idempotente lo cual hace que aunque se vuelva a llamar
 # Se va a obtener el mismo resultado
 
-@app.put('/movies/{id}', tags=['movies'])
+@app.put('/movies/{id}', tags=['movies'],response_model=List[Movies], status_code=200)
 # def update_movies(id:int, title:str=Body(), 
 #                   overview:str=Body(), year:int=Body(), 
 #                   rating:float= Body(), category:str=Body()):
-def update_movies(id:int =Path(ge=1), movie:Movies = Body()):
+def update_movies(id:int =Path(ge=1),movie:Movies = Body()):
     for item in movies:
         if item['id'] == id:
            
@@ -120,15 +121,15 @@ def update_movies(id:int =Path(ge=1), movie:Movies = Body()):
             item['rating']= movie.rating
             item['category']= movie.category
             
-            return movies
+            return JSONResponse(content=jsonable_encoder(movies))
 
-@app.delete('/movies/{id}', tags=['movies'])
-def delete_movies(id:int= Path(max_length=4)):
+@app.delete('/movies/{id}', tags=['movies'], response_model=List[Movies],status_code=200)
+def delete_movies(id:int= Path(le=2000)):
     for movie in movies:
         if movie['id'] == id:
             movies.remove(movie)
         
-            return movies
+            return JSONResponse(content=jsonable_encoder(movies))
 
 # Para ejecutar el servicio se utiliza la libreria uvicorn
 # Se indica el fichero y luego el nombre de la aplicacion en este caso app
