@@ -80,9 +80,11 @@ def get_movies():
 def get_movie(id:int = Path(ge=1, le=2000)):
     for item in movies:
         if item["id"] == id:
-            return JSONResponse(content=item)
+            return item
+            #return JSONResponse(content=item)
 
-    return JSONResponse(content=[])
+    return []
+    #return JSONResponse(content=[])
 
 # Sino agrego nada luego del parametro de entrada, la funcion
 # Lo toma como una query
