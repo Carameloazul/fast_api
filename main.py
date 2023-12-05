@@ -3,6 +3,7 @@ from fastapi import FastAPI, Body, Path, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated, List
+from jwt_manager import create_token
 # JSONresponse no es obligatorio, ya que fastapi lo usa por debajo
 # https://fastapi.tiangolo.com/advanced/response-directly/
 
@@ -10,6 +11,11 @@ from typing import Optional, Annotated, List
 # Con el parametro le(less equal) declaro que el valor entrante
 # Tiene que ser menor o igual al que se le asigne eje: le = 1000
 # El parametro ge(greater equal) establece un minimo
+
+class User(BaseModel):
+    email:str
+    password:str
+
 class Movies(BaseModel):
     #id : int | None = None
     id: Optional[int] 
@@ -22,21 +28,22 @@ class Movies(BaseModel):
     # El contenido por defecto se puede poner de la sgt manera:
 
 
-    # Esto no funciona, no se aun porque      
-    # model_config ={
-    #     "json_schema_extra":{
-    #           "example":[
-    #               {
-    #                 "id":1,                 
-    #                 "title" : "Mi pelicula",
-    #                 "overview" : "Descripcion de la pelicula",
-    #                 "year" : 2022,
-    #                 "rating" : 9.8,
-    #                 "category" : "Accion"
-    #                }
-    #                 ]                
-    #               }
-    #         }
+    # Tambien se puede usar json_schema_extra pero es mas complicado
+    #model_config ={
+        #"json_schema_extra":{
+    class Config:
+              example=[
+                  {
+                    "id":1,                 
+                    "title" : "Mi pelicula",
+                    "overview" : "Descripcion de la pelicula",
+                    "year" : 2022,
+                    "rating" : 9.8,
+                    "category" : "Accion"
+                   }
+                    ]                
+               #   }
+           # }
         
 
 app = FastAPI()
@@ -51,6 +58,12 @@ def message():
     # Puedo retornar lo que quiera, incluso html
     #return {"Hello ","World!"}
     return HTMLResponse('<h1>Hello World!</h1>')
+
+@app.post('/',tags=['tags'])
+def login(user:User):
+    if user.email == "pepito@gmail.com" and user.password == "admin":
+        token = create_token(user.model_dump(exclude_unset=True))
+    return token
 
 movies = [
     {
@@ -73,18 +86,18 @@ movies = [
 ]
 
 @app.get('/movies', tags=['movies'],response_model=List[Movies])
-def get_movies():
+def get_movies()->List[Movies]:
     
     return JSONResponse(content=jsonable_encoder(movies))
 
 @app.get('/movies/{id}',tags=['movies'], response_model=Movies)
-def get_movie(id:int = Path(ge=1, le=2000)):
+def get_movie(id:int = Path(ge=1, le=2000))->Movies|list:
     for item in movies:
         if item["id"] == id:
             #return item
             return JSONResponse(content=item)
 
-    return JSONResponse([])
+    return JSONResponse(status_code=404,content=[])
     #return JSONResponse(content=[])
 
 # Sino agrego nada luego del parametro de entrada, la funcion
@@ -95,14 +108,15 @@ def get_movies_by_category(category:str= Query(max_length=10), year:int = Query(
     
     return movie
 
-@app.post('/movies',tags=['movies'],response_model=List[Movies] ,status_code=201)
+@app.post('/movies',tags=['movies'],response_model=dict ,status_code=201)
 # def add_movie(id:int = Body(),title:str= Body(), 
 #               overview:str= Body(), year:int= Body(),
 #               rating:float= Body(), category:str = Body() ):
-def add_movie(movie:Movies=Body()):
+def add_movie(movie:Movies=Body())->dict:
     movies.append(movie)
     #return list(movies)
-    return JSONResponse(content=jsonable_encoder(movies))
+    return JSONResponse(content={"message":"Se ha registrado la pelicula",
+                                 "movies":jsonable_encoder(movies)})
 
 # El metodo PUT es idempotente lo cual hace que aunque se vuelva a llamar
 # Se va a obtener el mismo resultado
@@ -111,7 +125,7 @@ def add_movie(movie:Movies=Body()):
 # def update_movies(id:int, title:str=Body(), 
 #                   overview:str=Body(), year:int=Body(), 
 #                   rating:float= Body(), category:str=Body()):
-def update_movies(id:int =Path(ge=1),movie:Movies = Body()):
+def update_movies(id:int|None =Path(ge=1),movie:Movies = Body()):
     for item in movies:
         if item['id'] == id:
            
