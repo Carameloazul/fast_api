@@ -1,9 +1,11 @@
 from fastapi.encoders import jsonable_encoder
-from fastapi import FastAPI, Body, Path, Query
+from fastapi import FastAPI, Body, Path, Query, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated, List
-from jwt_manager import create_token
+from jwt_manager import create_token, validate_token
+from fastapi.security import HTTPBearer
+
 # JSONresponse no es obligatorio, ya que fastapi lo usa por debajo
 # https://fastapi.tiangolo.com/advanced/response-directly/
 
@@ -11,6 +13,15 @@ from jwt_manager import create_token
 # Con el parametro le(less equal) declaro que el valor entrante
 # Tiene que ser menor o igual al que se le asigne eje: le = 1000
 # El parametro ge(greater equal) establece un minimo
+
+class JWTBearer(HTTPBearer):
+    async def __call__(self, request: Request):
+        print(request)
+        auth = await super().__call__(request)  
+        data  = validate_token(auth.credentials)
+        
+        if data['email'] != "pepito@gmail.com":
+            raise HTTPException(status_code =403, detail = "Credenciales son invalidas")
 
 class User(BaseModel):
     email:str
@@ -59,11 +70,15 @@ def message():
     #return {"Hello ","World!"}
     return HTMLResponse('<h1>Hello World!</h1>')
 
+# Con el metodo model_dump(exclude_unset=True) convierto 
+# El objeto user que es de tipo User, a un diccionario de Python
 @app.post('/',tags=['tags'])
 def login(user:User):
     if user.email == "pepito@gmail.com" and user.password == "admin":
         token = create_token(user.model_dump(exclude_unset=True))
-    return token
+        return JSONResponse(status_code=200,content=token)
+    else:
+        return JSONResponse(content="Nombre de usuario o password incorrecto")
 
 movies = [
     {
@@ -85,7 +100,10 @@ movies = [
 
 ]
 
-@app.get('/movies', tags=['movies'],response_model=List[Movies])
+
+# Con jsonable_encoder convierto movies de tipo Movies a 
+# un JSON
+@app.get('/movies', tags=['movies'],response_model=List[Movies], dependencies=[Depends(JWTBearer())])
 def get_movies()->List[Movies]:
     
     return JSONResponse(content=jsonable_encoder(movies))
